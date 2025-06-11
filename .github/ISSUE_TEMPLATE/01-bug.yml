@@ -10,8 +10,8 @@ body:
   - type: checkboxes
     id: prereqs
     attributes:
-      label: 
-      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/apple/container/blob/main/CONTRIBUTING.md). 
+      label: I have done the following
+      description: Select that you have completed the following prerequisites. 
       options:
         - label: I have searched the existing issues
           required: true
