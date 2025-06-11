@@ -51,12 +51,14 @@ body:
       description: |
         examples: 
           - **OS**: MacOS 26 Beta 1
-          - **Swift**: Apple Swift version 6.2
-          - **Xcode**: Xcode 26 Beta 17A5241e
+          - **swift**: Apple Swift version 6.2
+          - **xcode**: Xcode 26 Beta 17A5241e
+          - **container**: container CLI version 0.1.0
       value: |
         - OS: 
-        - Swift: 
-        - Xcode: 
+        - swift: 
+        - xcode: 
+        - container: 
       render: markdown
     validations:
       required: true
