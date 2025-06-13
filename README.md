@@ -31,6 +31,14 @@ Download the latest signed installer package for `container` from the [GitHub re
 
 To install the tool, double click the package file and follow the instructions. Enter your administrator password when prompted, to give the installer permission to place the installed files under `/usr/local`.
 
+### Start using container CLI 
+
+To begin using `container` CLI installed above, start the service that `container` uses with:
+
+```bash
+container system start
+```
+
 ### Uninstall
 
 Use the `uninstall-container.sh` script to remove `container` from your system. To remove your user data along with the tool, run:
