@@ -76,7 +76,7 @@ public struct Flags {
             self.scheme = scheme
         }
 
-        @Option(help: "Scheme to use when conntecting to the container registry. One of (http, https, auto)")
+        @Option(help: "Scheme to use when connecting to the container registry. One of (http, https, auto)")
         public var scheme: String = "auto"
     }
 
@@ -91,6 +91,9 @@ public struct Flags {
 
         @Option(name: .customLong("mount"), help: "Add a mount to the container (type=<>,source=<>,target=<>,readonly)")
         public var mounts: [String] = []
+
+        @Option(name: .customLong("publish-socket"), help: "Publish a socket from container to host (format: host_path:container_path)")
+        public var publishSockets: [String] = []
 
         @Option(name: .customLong("tmpfs"), help: "Add a tmpfs mount to the container at the given path")
         public var tmpFs: [String] = []
@@ -138,6 +141,14 @@ public struct Flags {
 
         @Option(name: [.customLong("label"), .customShort("l")], help: "Add a key=value label to the container")
         public var labels: [String] = []
+    }
+
+    public struct Progress: ParsableArguments {
+        public init() {}
+
+        public init(disableProgressUpdates: Bool) {
+            self.disableProgressUpdates = disableProgressUpdates
+        }
 
         @Flag(name: .customLong("disable-progress-updates"), help: "Disable progress bar updates")
         public var disableProgressUpdates = false

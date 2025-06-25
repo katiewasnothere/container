@@ -21,7 +21,7 @@ export GIT_COMMIT := $(shell git rev-parse HEAD)
 SWIFT := "/usr/bin/swift"
 DESTDIR ?= /usr/local/
 ROOT_DIR := $(shell git rev-parse --show-toplevel)
-BUILD_BIN_DIR := $(shell $(SWIFT) build -c $(BUILD_CONFIGURATION) --show-bin-path)
+BUILD_BIN_DIR = $(shell $(SWIFT) build -c $(BUILD_CONFIGURATION) --show-bin-path)
 STAGING_DIR := bin/$(BUILD_CONFIGURATION)/staging/
 PKG_PATH := bin/$(BUILD_CONFIGURATION)/container-installer-unsigned.pkg
 DSYM_DIR := bin/$(BUILD_CONFIGURATION)/bundle/container-dSYM
@@ -49,7 +49,7 @@ all: init-block
 .PHONY: build
 build:
 	@echo Building container binaries...
-	@#Remove this when the updated MacOS SDK is available publicly
+	@#Remove this when the updated macOS SDK is available publicly
 	$(SWIFT) build -c $(BUILD_CONFIGURATION) $(CURRENT_SDK_ARGS) ; \
 
 .PHONY: container
@@ -143,7 +143,12 @@ integration: init-block
 	@echo "Removing any existing containers"
 	@bin/container rm --all
 	@echo "Starting CLI integration tests"
-	@RUN_CLI_INTEGRATION_TESTS=1 $(SWIFT) test -c $(BUILD_CONFIGURATION) $(CURRENT_SDK_ARGS) --filter TestCLI
+	@$(SWIFT) test -c $(BUILD_CONFIGURATION) $(CURRENT_SDK_ARGS) --filter TestCLIRunLifecycle
+	@$(SWIFT) test -c $(BUILD_CONFIGURATION) $(CURRENT_SDK_ARGS) --filter TestCLIExecCommand
+	@$(SWIFT) test -c $(BUILD_CONFIGURATION) $(CURRENT_SDK_ARGS) --filter TestCLIRunCommand
+	@$(SWIFT) test -c $(BUILD_CONFIGURATION) $(CURRENT_SDK_ARGS) --filter TestCLIImagesCommand
+	@$(SWIFT) test -c $(BUILD_CONFIGURATION) $(CURRENT_SDK_ARGS) --filter TestCLIRunBase
+	@$(SWIFT) test -c $(BUILD_CONFIGURATION) $(CURRENT_SDK_ARGS) --filter TestCLIBuildBase
 	@echo Ensuring apiserver stopped after the CLI integration tests...
 	@scripts/ensure-container-stopped.sh
 
@@ -177,12 +182,10 @@ serve-docs:
 	@python3 -m http.server --bind 127.0.0.1 --directory ./_serve
 
 .PHONY: docs
-docs: _site
-
-_site:
+docs:
 	@echo Updating API documentation...
-	rm -rf $@
-	@scripts/make-docs.sh $@ container
+	@rm -rf _site
+	@scripts/make-docs.sh _site container
 
 .PHONY: cleancontent
 cleancontent:

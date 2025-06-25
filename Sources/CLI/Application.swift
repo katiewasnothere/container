@@ -21,6 +21,7 @@ import CVersion
 import ContainerClient
 import ContainerLog
 import ContainerPlugin
+import ContainerizationError
 import ContainerizationOS
 import Foundation
 import Logging
@@ -150,6 +151,13 @@ struct Application: AsyncParsableCommand {
     public static func main() async throws {
         restoreCursorAtExit()
 
+        #if DEBUG
+        let warning = "Running debug build. Performance may be degraded."
+        let formattedWarning = "\u{001B}[33mWarning!\u{001B}[0m \(warning)\n"
+        let warningData = Data(formattedWarning.utf8)
+        FileHandle.standardError.write(warningData)
+        #endif
+
         let fullArgs = CommandLine.arguments
         let args = Array(fullArgs.dropFirst())
 
@@ -169,7 +177,13 @@ struct Application: AsyncParsableCommand {
                 Self.printModifiedHelpText()
                 return
             }
-            Application.exit(withError: error)
+            let errorAsString: String = String(describing: error)
+            if errorAsString.contains("XPC connection error") {
+                let modifiedError = ContainerizationError(.interrupted, message: "\(error)\nEnsure container system service has been started with `container system start`.")
+                Application.exit(withError: modifiedError)
+            } else {
+                Application.exit(withError: error)
+            }
         }
     }
 
@@ -177,7 +191,9 @@ struct Application: AsyncParsableCommand {
         let signals = AsyncSignalHandler.create(notify: Application.signalSet)
         return try await withThrowingTaskGroup(of: Int32?.self, returning: Int32.self) { group in
             let waitAdded = group.addTaskUnlessCancelled {
-                try await process.wait()
+                let code = try await process.wait()
+                try await io.wait()
+                return code
             }
 
             guard waitAdded else {
@@ -287,7 +303,7 @@ extension Application {
         versionDetails["build"] = "debug"
         #endif
         #if CURRENT_SDK
-        versionDetails["sdk"] = "MacOS 15"
+        versionDetails["sdk"] = "macOS 15"
         #endif
         let gitCommit = {
             let sha = get_git_commit().map { String(cString: $0) }

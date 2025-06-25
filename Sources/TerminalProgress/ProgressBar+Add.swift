@@ -61,27 +61,29 @@ extension ProgressBar {
 
     /// Performs a check to see if the progress bar should be finished.
     public func checkIfFinished() {
-        if let totalTasks = state.totalTasks {
-            // For tasks, we're showing the current task rather then the number of completed tasks.
-            guard state.tasks > totalTasks else {
-                return
-            }
+        var finished = true
+        var defined = false
+        if let totalTasks = state.totalTasks, totalTasks > 0 {
+            // For tasks, we're showing the current task rather than the number of completed tasks.
+            finished = finished && state.tasks == totalTasks
+            defined = true
         }
-        if let totalItems = state.totalItems {
-            guard state.items == totalItems else {
-                return
-            }
+        if let totalItems = state.totalItems, totalItems > 0 {
+            finished = finished && state.items == totalItems
+            defined = true
         }
-        if let totalSize = state.totalSize {
-            guard state.size == totalSize else {
-                return
-            }
+        if let totalSize = state.totalSize, totalSize > 0 {
+            finished = finished && state.size == totalSize
+            defined = true
         }
-        finish()
+        if defined && finished {
+            finish()
+        }
     }
 
     /// Sets the current tasks.
-    /// - Parameter tasks: The current tasks to set.
+    /// - Parameter newTasks: The current tasks to set.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
     public func set(tasks newTasks: Int, render: Bool = true) {
         state.tasks = newTasks
         if render {
@@ -91,14 +93,21 @@ extension ProgressBar {
     }
 
     /// Performs an addition to the current tasks.
-    /// - Parameter tasks: The tasks to add to the current tasks.
-    public func add(tasks toAdd: Int, render: Bool = true) {
-        let newTasks = state.tasks + toAdd
-        set(tasks: newTasks, render: render)
+    /// - Parameter delta: The tasks to add to the current tasks.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
+    public func add(tasks delta: Int, render: Bool = true) {
+        _state.withLock {
+            let newTasks = $0.tasks + delta
+            $0.tasks = newTasks
+        }
+        if render {
+            self.render()
+        }
     }
 
     /// Sets the total tasks.
-    /// - Parameter totalTasks: The total tasks to set.
+    /// - Parameter newTotalTasks: The total tasks to set.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
     public func set(totalTasks newTotalTasks: Int, render: Bool = true) {
         state.totalTasks = newTotalTasks
         if render {
@@ -107,15 +116,22 @@ extension ProgressBar {
     }
 
     /// Performs an addition to the total tasks.
-    /// - Parameter totalTasks: The tasks to add to the total tasks.
-    public func add(totalTasks toAdd: Int, render: Bool = true) {
-        let totalTasks = state.totalTasks ?? 0
-        let newTotalTasks = totalTasks + toAdd
-        set(totalTasks: newTotalTasks, render: render)
+    /// - Parameter delta: The tasks to add to the total tasks.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
+    public func add(totalTasks delta: Int, render: Bool = true) {
+        _state.withLock {
+            let totalTasks = $0.totalTasks ?? 0
+            let newTotalTasks = totalTasks + delta
+            $0.totalTasks = newTotalTasks
+        }
+        if render {
+            self.render()
+        }
     }
 
     /// Sets the items name.
-    /// - Parameter items: The current items to set.
+    /// - Parameter newItemsName: The current items to set.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
     public func set(itemsName newItemsName: String, render: Bool = true) {
         state.itemsName = newItemsName
         if render {
@@ -124,7 +140,7 @@ extension ProgressBar {
     }
 
     /// Sets the current items.
-    /// - Parameter items: The current items to set.
+    /// - Parameter newItems: The current items to set.
     public func set(items newItems: Int, render: Bool = true) {
         state.items = newItems
         if render {
@@ -133,14 +149,21 @@ extension ProgressBar {
     }
 
     /// Performs an addition to the current items.
-    /// - Parameter items: The items to add to the current items.
-    public func add(items toAdd: Int, render: Bool = true) {
-        let newItems = state.items + toAdd
-        set(items: newItems, render: render)
+    /// - Parameter delta: The items to add to the current items.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
+    public func add(items delta: Int, render: Bool = true) {
+        _state.withLock {
+            let newItems = $0.items + delta
+            $0.items = newItems
+        }
+        if render {
+            self.render()
+        }
     }
 
     /// Sets the total items.
-    /// - Parameter totalItems: The total items to set.
+    /// - Parameter newTotalItems: The total items to set.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
     public func set(totalItems newTotalItems: Int, render: Bool = true) {
         state.totalItems = newTotalItems
         if render {
@@ -149,15 +172,22 @@ extension ProgressBar {
     }
 
     /// Performs an addition to the total items.
-    /// - Parameter totalItems: The items to add to the total items.
-    public func add(totalItems toAdd: Int, render: Bool = true) {
-        let totalItems = state.totalItems ?? 0
-        let newTotalItems = totalItems + toAdd
-        set(totalItems: newTotalItems, render: render)
+    /// - Parameter delta: The items to add to the total items.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
+    public func add(totalItems delta: Int, render: Bool = true) {
+        _state.withLock {
+            let totalItems = $0.totalItems ?? 0
+            let newTotalItems = totalItems + delta
+            $0.totalItems = newTotalItems
+        }
+        if render {
+            self.render()
+        }
     }
 
     /// Sets the current size.
-    /// - Parameter size: The current size to set.
+    /// - Parameter newSize: The current size to set.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
     public func set(size newSize: Int64, render: Bool = true) {
         state.size = newSize
         if render {
@@ -166,14 +196,21 @@ extension ProgressBar {
     }
 
     /// Performs an addition to the current size.
-    /// - Parameter size: The size to add to the current size.
-    public func add(size toAdd: Int64, render: Bool = true) {
-        let newSize = state.size + toAdd
-        set(size: newSize, render: render)
+    /// - Parameter delta: The size to add to the current size.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
+    public func add(size delta: Int64, render: Bool = true) {
+        _state.withLock {
+            let newSize = $0.size + delta
+            $0.size = newSize
+        }
+        if render {
+            self.render()
+        }
     }
 
     /// Sets the total size.
-    /// - Parameter totalSize: The total size to set.
+    /// - Parameter newTotalSize: The total size to set.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
     public func set(totalSize newTotalSize: Int64, render: Bool = true) {
         state.totalSize = newTotalSize
         if render {
@@ -182,10 +219,16 @@ extension ProgressBar {
     }
 
     /// Performs an addition to the total size.
-    /// - Parameter totalSize: The size to add to the total size.
-    public func add(totalSize toAdd: Int64, render: Bool = true) {
-        let totalSize = state.totalSize ?? 0
-        let newTotalSize = totalSize + toAdd
-        set(totalSize: newTotalSize, render: render)
+    /// - Parameter delta: The size to add to the total size.
+    /// - Parameter render: The flag indicating whether the progress bar has to render after the update.
+    public func add(totalSize delta: Int64, render: Bool = true) {
+        _state.withLock {
+            let totalSize = $0.totalSize ?? 0
+            let newTotalSize = totalSize + delta
+            $0.totalSize = newTotalSize
+        }
+        if render {
+            self.render()
+        }
     }
 }
