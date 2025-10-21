@@ -867,9 +867,9 @@ public actor SandboxService {
     }
 
     private nonisolated func configureProcessConfig(config: ProcessConfiguration, stdio: [FileHandle?], containerConfig: ContainerConfiguration)
-        -> LinuxContainer.Configuration.Process
+        -> LinuxProcessConfiguration
     {
-        var proc = LinuxContainer.Configuration.Process()
+        var proc = LinuxProcessConfiguration.init()
         proc.stdin = stdio[0]
         proc.stdout = stdio[1]
         proc.stderr = stdio[2]
