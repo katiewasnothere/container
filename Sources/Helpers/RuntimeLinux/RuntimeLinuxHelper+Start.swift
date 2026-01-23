@@ -60,18 +60,9 @@ extension RuntimeLinuxHelper {
                 try adjustLimits()
                 signal(SIGPIPE, SIG_IGN)
 
-                log.info("configuring XPC server")
-                let interfaceStrategy: any InterfaceStrategy
-                if #available(macOS 26, *) {
-                    interfaceStrategy = NonisolatedInterfaceStrategy(log: log)
-                } else {
-                    interfaceStrategy = IsolatedInterfaceStrategy()
-                }
-
                 nonisolated(unsafe) let anonymousConnection = xpc_connection_create(nil, nil)
                 let server = SandboxService(
                     root: .init(fileURLWithPath: root),
-                    interfaceStrategy: interfaceStrategy,
                     eventLoopGroup: eventLoopGroup,
                     connection: anonymousConnection,
                     log: log

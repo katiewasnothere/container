@@ -39,7 +39,6 @@ import struct ContainerizationOCI.Process
 public actor SandboxService {
     private let connection: xpc_connection_t
     private let root: URL
-    private let interfaceStrategy: InterfaceStrategy
     private var container: ContainerInfo?
     private let monitor: ExitMonitor
     private let eventLoopGroup: any EventLoopGroup
@@ -69,13 +68,11 @@ public actor SandboxService {
     ///   - log: The destination for log messages.
     public init(
         root: URL,
-        interfaceStrategy: InterfaceStrategy,
         eventLoopGroup: any EventLoopGroup,
         connection: xpc_connection_t,
         log: Logger
     ) {
         self.root = root
-        self.interfaceStrategy = interfaceStrategy
         self.log = log
         self.monitor = ExitMonitor(log: log)
         self.eventLoopGroup = eventLoopGroup
@@ -154,7 +151,15 @@ public actor SandboxService {
                 )
                 attachments.append(attachment)
 
-                let interface = try self.interfaceStrategy.toInterface(
+                let networkStatus = try await ClientNetwork.get(id: network.network)
+                let pluginInfo = networkStatus.configuration.pluginInfo
+
+                var interfaceStrategy: InterfaceStrategy = IsolatedInterfaceStrategy()
+                if #available(macOS 26, *), pluginInfo.plugin == "container-network-vmnet", pluginInfo.variant == "reserved" {
+                    interfaceStrategy = NonisolatedInterfaceStrategy(log: self.log)
+                }
+
+                let interface = try interfaceStrategy.toInterface(
                     attachment: attachment,
                     interfaceIndex: index,
                     additionalData: additionalData

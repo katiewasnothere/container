@@ -68,4 +68,11 @@ public enum NetworkState: Codable, Sendable {
         case .running(let configuration, _): configuration.creationDate
         }
     }
+
+    public var configuration: NetworkConfiguration {
+        switch self {
+        case .created(let configuration): configuration
+        case .running(let configuration, _): configuration
+        }
+    }
 }

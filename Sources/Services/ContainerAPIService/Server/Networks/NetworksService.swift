@@ -155,19 +155,18 @@ public actor NetworksService {
             let client = Self.getClient(configuration: configuration)
 
             // Ensure the network is running, and set up the persistent network state
-            // using our configuration data, as the one from the helper doesn't include
-            // metadata.
-            guard case .running(_, let status) = try await client.state() else {
+            // using the configuration data from the network helper.
+            let helperState = try await client.state()
+            guard case .running(let helperConfig, _) = helperState else {
                 throw ContainerizationError(.invalidState, message: "network \(configuration.id) failed to start")
             }
-            let networkState: NetworkState = .running(configuration, status)
-            let serviceState = NetworkServiceState(networkState: networkState, client: client)
+            let serviceState = NetworkServiceState(networkState: helperState, client: client)
             await self.setServiceState(key: configuration.id, value: serviceState)
 
             // Persist the configuration data.
             do {
-                try await self.store.create(configuration)
-                return networkState
+                try await self.store.create(helperConfig)
+                return helperState
             } catch {
                 await self.removeServiceState(key: configuration.id)
                 do {
@@ -379,6 +378,12 @@ public actor NetworksService {
             }
 
             args += ["--subnet-v6", ipv6Subnet.description]
+        }
+
+        if !configuration.labels.isEmpty {
+            for label in configuration.labels {
+                args += ["--label", "\(label.key)=\(label.value)"]
+            }
         }
 
         if let variant = configuration.pluginInfo.variant {

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 import ArgumentParser
+import ContainerAPIClient
 import ContainerNetworkService
 import ContainerNetworkServiceClient
 import ContainerResource
@@ -59,6 +60,9 @@ extension NetworkVmnetHelper {
             return .reserved
         }()
 
+        @Option(name: .customLong("label"), help: "Set metadata for a network")
+        var labels: [String] = []
+
         func run() async throws {
             let commandName = NetworkVmnetHelper._commandName
             let log = setupLogger(id: id, debug: debug)
@@ -76,11 +80,13 @@ extension NetworkVmnetHelper {
                     variant: self.variant.rawValue
                 )
 
+                let parsedLabels = Utility.parseKeyValuePairs(labels)
                 let configuration = try NetworkConfiguration(
                     id: id,
                     mode: .nat,
                     ipv4Subnet: ipv4Subnet,
                     ipv6Subnet: ipv6Subnet,
+                    labels: parsedLabels,
                     pluginInfo: pluginInfo
                 )
                 let network = try Self.createNetwork(

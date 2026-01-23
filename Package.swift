@@ -244,6 +244,7 @@ let package = Package(
                 .product(name: "ContainerizationIO", package: "containerization"),
                 .product(name: "ContainerizationOS", package: "containerization"),
                 "ContainerLog",
+                "ContainerAPIClient",
                 "ContainerNetworkService",
                 "ContainerNetworkServiceClient",
                 "ContainerResource",

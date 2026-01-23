@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 import ContainerResource
-import ContainerSandboxService
 import ContainerXPC
 import Containerization
 

@@ -246,7 +246,7 @@ extension PluginLoader {
         }
         let domain = try ServiceManager.getDomainString()
         let label = "\(domain)/\(plugin.getLaunchdLabel(instanceId: instanceId))"
-        log?.info("Deregistering plugin", metadata: ["id": "\(plugin.getLaunchdLabel())"])
+        log?.info("Deregistering plugin", metadata: ["id": "\(plugin.getLaunchdLabel(instanceId: instanceId))"])
         try ServiceManager.deregister(fullServiceLabel: label)
     }
 
