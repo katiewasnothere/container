@@ -54,27 +54,6 @@ public actor SandboxService {
     private static let sshAuthSocketGuestPath = "/run/host-services/ssh-auth.sock"
     private static let sshAuthSocketEnvVar = "SSH_AUTH_SOCK"
 
-    class ExitWaiter {
-        public var exitCode: Int32? = nil
-        public var continuations: [CheckedContinuation<ExitStatus, Never>] = []
-
-        public func register(_ cc: CheckedContinuation<ExitStatus, Never>) {
-            continuations.append(cc)
-        }
-
-        public func doExit(code: Int32) {
-            for cc in continuations {
-                cc.resume(returning: ExitStatus(exitCode: code))
-            }
-
-            exitCode = code
-        }
-
-        public func exited() -> Bool {
-            exitCode != nil
-        }
-    }
-
     private static func sshAuthSocketHostUrl(config: ContainerConfiguration) -> URL? {
         if config.ssh, let sshSocket = Foundation.ProcessInfo.processInfo.environment[Self.sshAuthSocketEnvVar] {
             return URL(fileURLWithPath: sshSocket)
@@ -618,14 +597,7 @@ public actor SandboxService {
         guard let id = message.string(key: SandboxKeys.id.rawValue) else {
             throw ContainerizationError(.invalidArgument, message: "missing id in wait xpc message")
         }
-
-        let exitStatus = await withCheckedContinuation { cc in
-            // Is this safe since we are in an actor? :(
-            let (added, exitCode) = self.addWaiter(id: id, cont: cc)
-            if !added {
-                cc.resume(returning: ExitStatus(exitCode: exitCode ?? -1))
-            }
-        }
+        let exitStatus = await waiters[id]?.wait() ?? ExitStatus(exitCode: -1)
         let reply = message.reply()
         reply.set(key: SandboxKeys.exitCode.rawValue, value: Int64(exitStatus.exitCode))
         reply.set(key: SandboxKeys.exitedAt.rawValue, value: exitStatus.exitedAt)
@@ -1072,7 +1044,7 @@ public actor SandboxService {
         await self.stopSocketForwarders()
 
         let status = exitStatus ?? ExitStatus(exitCode: 255)
-        self.releaseWaiters(for: id, status: status)
+        await self.releaseWaiters(for: id, status: status)
     }
 }
 
@@ -1299,24 +1271,8 @@ extension SandboxService {
         waiters[id] = ExitWaiter()
     }
 
-    private func addWaiter(id: String, cont: CheckedContinuation<ExitStatus, Never>) -> (Bool, Int32?) {
-        guard let current = waiters[id] else {
-            // No waiter initialized at all
-            return (false, nil)
-        }
-
-        if current.exited() {
-            // Waiter initialzed but already exited
-            return (false, current.exitCode)
-        }
-
-        // Waiter initialized and not exited. Guaranteed to exit later.
-        current.register(cont)
-        return (true, nil)
-    }
-
-    private func releaseWaiters(for id: String, status: ExitStatus) {
-        waiters[id]?.doExit(code: status.exitCode)
+    private func releaseWaiters(for id: String, status: ExitStatus) async {
+        await waiters[id]?.doExit(exitStatus: status)
     }
 
     private func setUnderlyingProcess(_ id: String, _ process: LinuxProcess) throws {
