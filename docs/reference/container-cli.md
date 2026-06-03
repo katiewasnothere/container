@@ -85,7 +85,7 @@ container run [<options>] <image> [<arguments> ...]
             - `10.*.*.*`
             - `192.168.*.*`
             - `172.16.*.*` through `172.31.*.*`
-        - The host ends with the machine's default container DNS domain (as defined in `DNSConfig.defaultDomain`, located [here](../Sources/ContainerPersistence/ContainerSystemConfig.swift))
+        - The host ends with the machine's default container DNS domain (as defined in `DNSConfig.defaultDomain`, located [here](../../Sources/ContainerPersistence/ContainerSystemConfig.swift))
 
         For internal/local registries, the client uses **HTTP**. Otherwise, it uses **HTTPS**.
 

@@ -110,13 +110,13 @@ For Container CLI issues, run commands with verbose output:
 container --debug <command>
 ```
 
-You can also use the `container logs` command to get logs from running containers. See the [container logs](command-reference.md#container-logs) documentation for full details.
+You can also use the `container logs` command to get logs from running containers. See the [container logs](reference/container-cli.md#container-logs) documentation for full details.
 ```bash
 container logs <container-id>
 ```
 
 ### System logs
-For system-level container issues, use the built-in system logs command. See the [container system logs](command-reference.md#container-system-logs) documentation for full details.
+For system-level container issues, use the built-in system logs command. See the [container system logs](reference/container-cli.md#container-system-logs) documentation for full details.
 ```bash
 container system logs
 ```

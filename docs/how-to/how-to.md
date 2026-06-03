@@ -62,7 +62,7 @@ total 4
 
 ## Build and run a multiplatform image
 
-Using the [project from the tutorial example](tutorial.md#set-up-a-simple-project), you can create an image to use both on Apple silicon Macs and on x86-64 servers.
+Using the [project from the tutorial example](../tutorials/tutorial.md#set-up-a-simple-project), you can create an image to use both on Apple silicon Macs and on x86-64 servers.
 
 When building the image, just add `--arch` options that direct the builder to create an image supporting both the `arm64` and `amd64` architectures:
 
@@ -602,7 +602,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o wrapper wrapper.go
 
 Use the `vminit` image tag corresponding to the `scVersion` value in the project `Package.swift` file.
 
-Or, use `vminit:latest` if you have a local `containerization` project in [edit mode](../BUILDING.md#develop-using-a-local-copy-of-containerization).
+Or, use `vminit:latest` if you have a local `containerization` project in [edit mode](../../BUILDING.md#develop-using-a-local-copy-of-containerization).
 
 ```dockerfile
 FROM ghcr.io/apple/containerization/vminit:0.32.2 AS base
