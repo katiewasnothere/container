@@ -51,6 +51,7 @@ public actor NetworksService {
         pluginLoader: PluginLoader,
         resourceRoot: FilePath,
         containersService: ContainersService,
+        defaultNetworkConfiguration: NetworkConfiguration,
         log: Logger,
         debugHelpers: Bool = false,
     ) async throws {
@@ -78,28 +79,40 @@ public actor NetworksService {
 
         let configurations = try await store.list()
         for configuration in configurations {
-            // Ensure the network with id "default" is marked as builtin.
-            var updatedLabels: [String: String]?
-            if configuration.id == NetworkClient.defaultNetworkName {
-                let role = configuration.labels[ResourceLabelKeys.role]
-                if role == nil || role != ResourceRoleValues.builtin {
-                    var labels = configuration.labels.dictionary
-                    labels[ResourceLabelKeys.role] = ResourceRoleValues.builtin
-                    updatedLabels = labels
-                }
-            }
+            var effectiveConfiguration = configuration
 
-            if let updatedLabels {
-                let updatedConfiguration = try NetworkConfiguration(
-                    name: configuration.name,
-                    mode: configuration.mode,
-                    ipv4Subnet: configuration.ipv4Subnet,
-                    ipv6Subnet: configuration.ipv6Subnet,
-                    labels: try .init(updatedLabels),
-                    plugin: configuration.plugin,
-                    options: configuration.options
-                )
-                try await store.update(updatedConfiguration)
+            // Reconcile the persisted default network with the system configuration and make sure
+            // the default network has the expected builtin label.
+            if effectiveConfiguration.id == NetworkClient.defaultNetworkName {
+                let subnetChanged =
+                    effectiveConfiguration.ipv4Subnet != defaultNetworkConfiguration.ipv4Subnet
+                    || effectiveConfiguration.ipv6Subnet != defaultNetworkConfiguration.ipv6Subnet
+                let needsBuiltinLabel = effectiveConfiguration.labels[ResourceLabelKeys.role] != ResourceRoleValues.builtin
+
+                if subnetChanged || needsBuiltinLabel {
+                    if subnetChanged {
+                        log.info(
+                            "updating default network subnet from system configuration",
+                            metadata: [
+                                "old.ipv4Subnet": "\(effectiveConfiguration.ipv4Subnet?.description ?? "nil")",
+                                "new.ipv4Subnet": "\(defaultNetworkConfiguration.ipv4Subnet?.description ?? "nil")",
+                                "old.ipv6Subnet": "\(effectiveConfiguration.ipv6Subnet?.description ?? "nil")",
+                                "new.ipv6Subnet": "\(defaultNetworkConfiguration.ipv6Subnet?.description ?? "nil")",
+                            ])
+                    }
+                    var labels = effectiveConfiguration.labels.dictionary
+                    labels[ResourceLabelKeys.role] = ResourceRoleValues.builtin
+                    effectiveConfiguration = try NetworkConfiguration(
+                        name: effectiveConfiguration.name,
+                        mode: effectiveConfiguration.mode,
+                        ipv4Subnet: defaultNetworkConfiguration.ipv4Subnet,
+                        ipv6Subnet: defaultNetworkConfiguration.ipv6Subnet,
+                        labels: try .init(labels),
+                        plugin: effectiveConfiguration.plugin,
+                        options: effectiveConfiguration.options
+                    )
+                    try await store.update(effectiveConfiguration)
+                }
             }
 
             // Start up the network.
@@ -108,23 +121,11 @@ public actor NetworksService {
             // 5 seconds or considerably more from the registration of this first
             // network service to its execution.
             do {
-                try await registerService(configuration: configuration)
-                let client = try Self.getClient(configuration: configuration)
+                try await registerService(configuration: effectiveConfiguration)
+                let client = try Self.getClient(configuration: effectiveConfiguration)
                 let networkStatus = try await client.status()
-                let finalConfiguration =
-                    updatedLabels.flatMap { labels in
-                        try? NetworkConfiguration(
-                            name: configuration.name,
-                            mode: configuration.mode,
-                            ipv4Subnet: configuration.ipv4Subnet,
-                            ipv6Subnet: configuration.ipv6Subnet,
-                            labels: (try? ResourceLabels(labels)) ?? configuration.labels,
-                            plugin: configuration.plugin,
-                            options: configuration.options
-                        )
-                    } ?? configuration
-                serviceStates[finalConfiguration.id] = NetworkEntry(
-                    configuration: finalConfiguration,
+                serviceStates[effectiveConfiguration.id] = NetworkEntry(
+                    configuration: effectiveConfiguration,
                     status: networkStatus,
                     client: client
                 )
@@ -132,7 +133,7 @@ public actor NetworksService {
                 log.error(
                     "failed to start network",
                     metadata: [
-                        "id": "\(configuration.id)",
+                        "id": "\(effectiveConfiguration.id)",
                         "error": "\(error)",
                     ])
             }
