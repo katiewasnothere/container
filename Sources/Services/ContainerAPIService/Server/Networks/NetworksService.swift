@@ -81,38 +81,12 @@ public actor NetworksService {
         for configuration in configurations {
             var effectiveConfiguration = configuration
 
-            // Reconcile the persisted default network with the system configuration and make sure
-            // the default network has the expected builtin label.
+            // If there's a default network in the store, always update it with the
+            // passed in default network configuration to ensure we have the correct
+            // default values configured.
             if effectiveConfiguration.id == NetworkClient.defaultNetworkName {
-                let subnetChanged =
-                    effectiveConfiguration.ipv4Subnet != defaultNetworkConfiguration.ipv4Subnet
-                    || effectiveConfiguration.ipv6Subnet != defaultNetworkConfiguration.ipv6Subnet
-                let needsBuiltinLabel = effectiveConfiguration.labels[ResourceLabelKeys.role] != ResourceRoleValues.builtin
-
-                if subnetChanged || needsBuiltinLabel {
-                    if subnetChanged {
-                        log.info(
-                            "updating default network subnet from system configuration",
-                            metadata: [
-                                "old.ipv4Subnet": "\(effectiveConfiguration.ipv4Subnet?.description ?? "nil")",
-                                "new.ipv4Subnet": "\(defaultNetworkConfiguration.ipv4Subnet?.description ?? "nil")",
-                                "old.ipv6Subnet": "\(effectiveConfiguration.ipv6Subnet?.description ?? "nil")",
-                                "new.ipv6Subnet": "\(defaultNetworkConfiguration.ipv6Subnet?.description ?? "nil")",
-                            ])
-                    }
-                    var labels = effectiveConfiguration.labels.dictionary
-                    labels[ResourceLabelKeys.role] = ResourceRoleValues.builtin
-                    effectiveConfiguration = try NetworkConfiguration(
-                        name: effectiveConfiguration.name,
-                        mode: effectiveConfiguration.mode,
-                        ipv4Subnet: defaultNetworkConfiguration.ipv4Subnet,
-                        ipv6Subnet: defaultNetworkConfiguration.ipv6Subnet,
-                        labels: try .init(labels),
-                        plugin: effectiveConfiguration.plugin,
-                        options: effectiveConfiguration.options
-                    )
-                    try await store.update(effectiveConfiguration)
-                }
+                effectiveConfiguration = defaultNetworkConfiguration
+                try await store.update(effectiveConfiguration)
             }
 
             // Start up the network.
