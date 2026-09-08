@@ -75,9 +75,7 @@ extension K8sHelper {
 
         log.info("Applying kindnet CNI", metadata: ["node": "\(nodeID)"])
         let manifest = try await loadKindnetManifest(log: log)
-        let apply =
-            "cat > /tmp/kindnet.yaml <<'EOF'\n\(manifest)\nEOF\n"
-            + "\(kubeconfigEnv) kubectl apply -f /tmp/kindnet.yaml"
+        let apply = "\(kubeconfigEnv) kubectl apply -f - <<'EOF'\n\(manifest)\nEOF"
         r = try await execCapture(
             containerId: nodeID, executable: "/bin/sh",
             arguments: ["-c", apply], client: client)
