@@ -50,13 +50,22 @@ public struct K8sStart: AsyncParsableCommand {
             return
         }
 
-        let io = try ProcessIO.create(tty: false, interactive: false, detach: true)
-        defer { try? io.close() }
-        let process = try await client.bootstrap(id: name, stdio: io.stdio)
-        try await process.start()
-        try io.closeAfterStart()
+        let workerNames = try await K8sHelper.workerContainerNames(clusterName: name, client: client)
+        let allNames = [name] + workerNames
 
-        try await K8sHelper.waitForNodeBooted(containerId: name, client: client, log: log)
+        for nodeName in allNames {
+            let node = nodeName == name ? container : try await client.get(id: nodeName)
+            guard node.status != .running else { continue }
+            let io = try ProcessIO.create(tty: false, interactive: false, detach: true)
+            defer { try? io.close() }
+            let process = try await client.bootstrap(id: nodeName, stdio: io.stdio)
+            try await process.start()
+            try io.closeAfterStart()
+        }
+
+        for nodeName in allNames {
+            try await K8sHelper.waitForNodeBooted(containerId: nodeName, client: client, log: log)
+        }
         try await K8sHelper.waitForReady(containerId: name, client: client, log: log)
 
         do {
