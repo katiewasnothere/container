@@ -160,6 +160,16 @@ container k8s create --name my-cluster --cni ./my-cni.yaml
 
 The manifest must be a plain Kubernetes YAML file (the same shape `kubectl apply -f` expects), not a Helm chart.
 
+### No CNI
+
+Pass `none` (case-insensitive) to skip installing a CNI entirely, so you can apply your own afterward:
+
+```bash
+container k8s create --name my-cluster --cni none
+```
+
+With `none`, the command returns as soon as the control plane is up, without waiting for nodes to reach `Ready`, which requires a working CNI. Nodes stay `NotReady` until you `kubectl apply` one yourself. 
+
 ### Example: Cilium
 
 Cilium is distributed as a Helm chart, so render a plain manifest from it first:

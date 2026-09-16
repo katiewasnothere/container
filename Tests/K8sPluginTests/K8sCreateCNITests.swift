@@ -16,7 +16,6 @@
 
 import ContainerizationError
 import Foundation
-import Logging
 import Testing
 
 @testable import ContainerK8s
@@ -41,29 +40,39 @@ struct K8sCreateCNIFlagTests {
     }
 }
 
-// MARK: - K8sHelper.loadCNIManifest
+// MARK: - CNISelection.resolve
 
-@Suite("K8sHelper.loadCNIManifest")
-struct LoadCNIManifestTests {
-    private let log = Logger(label: "test")
-
-    @Test func customPathReturnsItsContents() async throws {
-        let contents = "kind: DaemonSet\nmetadata:\n  name: my-custom-cni\n"
-        let dir = FileManager.default.temporaryDirectory
-        let url = dir.appendingPathComponent(UUID().uuidString + ".yaml")
-        try contents.write(to: url, atomically: true, encoding: .utf8)
-        defer { try? FileManager.default.removeItem(at: url) }
-
-        let result = try await K8sHelper.loadCNIManifest(path: url.path, log: log)
-        #expect(result == contents)
+@Suite("CNISelection.resolve")
+struct CNISelectionResolveTests {
+    @Test func nilResolvesToKindnet() throws {
+        #expect(try CNISelection.resolve(nil) == .kindnet)
     }
 
-    @Test func missingPathThrowsInvalidArgument() async throws {
+    @Test func noneResolvesToNone() throws {
+        #expect(try CNISelection.resolve("none") == .none)
+    }
+
+    @Test func noneIsCaseInsensitive() throws {
+        #expect(try CNISelection.resolve("None") == .none)
+        #expect(try CNISelection.resolve("NONE") == .none)
+        #expect(try CNISelection.resolve("nOnE") == .none)
+    }
+
+    @Test func existingPathResolvesToManifest() throws {
+        let dir = FileManager.default.temporaryDirectory
+        let url = dir.appendingPathComponent(UUID().uuidString + ".yaml")
+        try "kind: DaemonSet".write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        #expect(try CNISelection.resolve(url.path) == .manifest(URL(fileURLWithPath: url.path)))
+    }
+
+    @Test func missingPathThrowsInvalidArgument() throws {
         let missingPath = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString + "-does-not-exist.yaml").path
 
-        await #expect(throws: ContainerizationError.self) {
-            _ = try await K8sHelper.loadCNIManifest(path: missingPath, log: log)
+        #expect(throws: ContainerizationError.self) {
+            _ = try CNISelection.resolve(missingPath)
         }
     }
 }

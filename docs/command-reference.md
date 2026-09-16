@@ -1617,7 +1617,7 @@ container k8s create [--name <name>] [--node-image <image>] [--cni <path>] [--rm
 
 *   `--name <name>`: Cluster name (default: `k8s-dev`)
 *   `--node-image <image>`: Node image reference (default: `docker.io/kindest/node:v1.35.5`)
-*   `--cni <path>`: Optional path to a CNI manifest to apply, or `none` to skip installing a CNI. If not provided, the bundled kindnet CNI is used. With `none`, the command returns without waiting for nodes to become `Ready`, since that requires a CNI; apply your own afterward with `kubectl apply`.
+*   `--cni <path>`: Optional path to a CNI manifest to apply, or `none` (case-insensitive) to skip installing a CNI. If not provided, the bundled kindnet CNI is used.
 *   `--rm`: Remove the cluster container after it stops
 
 **Resource Options**
@@ -1654,17 +1654,18 @@ container k8s create --cni none
 
 ### `container k8s start`
 
-Starts a stopped Kubernetes cluster and refreshes its entry in `~/.kube/config` (the container IP can change between starts).
+Starts a stopped Kubernetes cluster and refreshes its entry in `~/.kube/config` (the container IP can change between starts). By default this returns as soon as the node has booted, without waiting for it to report `Ready`; pass `--wait` to block until it does.
 
 **Usage**
 
 ```bash
-container k8s start [--name <name>] [--debug]
+container k8s start [--name <name>] [--wait] [--debug]
 ```
 
 **Options**
 
 *   `--name <name>`: Cluster name (default: `k8s-dev`)
+*   `--wait`: Wait for the node to report `Ready` before returning
 
 **Examples**
 
@@ -1674,6 +1675,9 @@ container k8s start
 
 # start a named cluster
 container k8s start --name my-cluster
+
+# start and wait for the node to become Ready
+container k8s start --wait
 ```
 
 ### `container k8s delete (rm)`

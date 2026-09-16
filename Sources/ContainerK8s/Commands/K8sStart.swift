@@ -33,6 +33,9 @@ public struct K8sStart: AsyncParsableCommand {
     @Option(name: .long, help: "Cluster name (default: \(K8sHelper.defaultName))")
     var name: String = K8sHelper.defaultName
 
+    @Flag(name: .long, help: "Wait for the node to report Ready before returning")
+    var wait: Bool = false
+
     public func run() async throws {
         LoggingSystem.bootstrap { _ in StderrLogHandler() }
         let log = Logger(label: K8sHelper.pluginName)
@@ -57,7 +60,10 @@ public struct K8sStart: AsyncParsableCommand {
         try io.closeAfterStart()
 
         try await K8sHelper.waitForNodeBooted(containerId: name, client: client, log: log)
-        try await K8sHelper.waitForReady(containerId: name, client: client, log: log)
+
+        if wait {
+            try await K8sHelper.waitForReady(containerId: name, client: client, log: log)
+        }
 
         do {
             let fqdn = await K8sHelper.detectFQDN(name: name)

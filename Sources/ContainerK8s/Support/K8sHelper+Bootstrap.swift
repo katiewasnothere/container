@@ -35,7 +35,7 @@ extension K8sHelper {
 
     static func bootstrapControlPlane(
         nodeID: String, apiServerSANs: [String], advertiseAddress: String,
-        schedulable: Bool, cniManifestPath: String? = nil, client: ContainerClient, log: Logger
+        schedulable: Bool, cni: CNISelection = .kindnet, client: ContainerClient, log: Logger
     ) async throws {
         let configYAML = initConfigYAML(advertiseAddress: advertiseAddress, certSANs: apiServerSANs)
         var r = try await execCapture(
@@ -73,18 +73,22 @@ extension K8sHelper {
                 arguments: ["taint", "nodes", "--all", "node-role.kubernetes.io/control-plane-"])
         }
 
-        if cniManifestPath == noCNIName {
+        switch cni {
+        case .none:
             log.info("Skipping CNI installation", metadata: ["node": "\(nodeID)"])
-        } else {
+        case .kindnet:
             log.info("Applying CNI manifest", metadata: ["node": "\(nodeID)"])
-            let manifest = try await loadCNIManifest(path: cniManifestPath, log: log)
-            let apply = "\(kubeconfigEnv) kubectl apply -f - <<'EOF'\n\(manifest)\nEOF"
-            r = try await execCapture(
-                containerId: nodeID, executable: "/bin/sh",
-                arguments: ["-c", apply], client: client)
-            guard r.code == 0 else {
-                throw ContainerizationError(.internalError, message: "apply CNI failed on \(nodeID): \(r.output)")
+            let manifest = try await loadKindnetManifest(log: log)
+            try await applyCNIManifest(manifest, nodeID: nodeID, client: client)
+        case .manifest(let url):
+            log.info("Applying CNI manifest", metadata: ["node": "\(nodeID)"])
+            let manifest: String
+            do {
+                manifest = try String(contentsOf: url, encoding: .utf8)
+            } catch {
+                throw ContainerizationError(.invalidArgument, message: "failed to read CNI manifest at \(url.path): \(error)")
             }
+            try await applyCNIManifest(manifest, nodeID: nodeID, client: client)
         }
     }
 
@@ -105,15 +109,14 @@ extension K8sHelper {
         return (token: parts[tokenIdx + 1], caCertHash: parts[hashIdx + 1])
     }
 
-    static func loadCNIManifest(path: String?, log: Logger) async throws -> String {
-        if let path {
-            do {
-                return try String(contentsOfFile: path, encoding: .utf8)
-            } catch {
-                throw ContainerizationError(.invalidArgument, message: "failed to read CNI manifest at \(path): \(error)")
-            }
+    private static func applyCNIManifest(_ manifest: String, nodeID: String, client: ContainerClient) async throws {
+        let apply = "\(kubeconfigEnv) kubectl apply -f - <<'EOF'\n\(manifest)\nEOF"
+        let r = try await execCapture(
+            containerId: nodeID, executable: "/bin/sh",
+            arguments: ["-c", apply], client: client)
+        guard r.code == 0 else {
+            throw ContainerizationError(.internalError, message: "apply CNI failed on \(nodeID): \(r.output)")
         }
-        return try await loadKindnetManifest(log: log)
     }
 
     private static func loadKindnetManifest(log: Logger) async throws -> String {

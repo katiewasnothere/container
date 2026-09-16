@@ -21,6 +21,31 @@ import ContainerizationOS
 import Foundation
 import Logging
 
+// MARK: - CNISelection
+
+/// Resolved interpretation of the `--cni` create flag: use the bundled kindnet
+/// CNI, skip CNI installation entirely, or apply a manifest at a given path.
+enum CNISelection: Equatable {
+    case kindnet
+    case none
+    case manifest(URL)
+
+    /// Parses a raw `--cni` flag value. Case-insensitively matches
+    /// `K8sHelper.noCNIName` ("none") as the sentinel for skipping CNI
+    /// installation; anything else is treated as a manifest path, which must
+    /// exist. `nil` resolves to `.kindnet`.
+    static func resolve(_ raw: String?) throws -> CNISelection {
+        guard let raw else { return .kindnet }
+        if raw.caseInsensitiveCompare(K8sHelper.noCNIName) == .orderedSame {
+            return .none
+        }
+        guard FileManager.default.fileExists(atPath: raw) else {
+            throw ContainerizationError(.invalidArgument, message: "CNI manifest not found at \(raw)")
+        }
+        return .manifest(URL(fileURLWithPath: raw))
+    }
+}
+
 // MARK: - K8sHelper
 
 public struct K8sHelper {
@@ -45,7 +70,7 @@ public struct K8sHelper {
         "Swap,SystemVerification,FileContent--proc-sys-net-bridge-bridge-nf-call-iptables"
     static let podSubnet = "10.244.0.0/16"
     /// Sentinel value for `--cni` that skips installing a CNI entirely.
-    public static let noCNIName = "none"
+    static let noCNIName = "none"
     // kubeadm default service subnet; must stay in sync if ClusterConfiguration.serviceSubnet is ever set.
     static let serviceSubnet = "10.96.0.0/12"
 
