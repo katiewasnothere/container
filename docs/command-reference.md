@@ -1649,30 +1649,6 @@ container k8s create --name temp-cluster --rm
 container k8s create --cni ./my-cni.yaml
 ```
 
-### `container k8s start`
-
-Starts a stopped Kubernetes cluster and refreshes its entry in `~/.kube/config` (the container IP can change between starts).
-
-**Usage**
-
-```bash
-container k8s start [--name <name>] [--debug]
-```
-
-**Options**
-
-*   `--name <name>`: Cluster name (default: `k8s-dev`)
-
-**Examples**
-
-```bash
-# start the default cluster
-container k8s start
-
-# start a named cluster
-container k8s start --name my-cluster
-```
-
 ### `container k8s delete (rm)`
 
 Stops and deletes a Kubernetes cluster container and removes its entry from `~/.kube/config`.
