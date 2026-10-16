@@ -54,15 +54,18 @@ public struct K8sCreate: AsyncParsableCommand {
     @Option(name: .long, help: "Optional path to a CNI manifest to apply, or \"NONE\" to skip installing a CNI.")
     var cni: String?
 
-    @Option(name: .long, help: "Number of worker nodes to create")
-    var workers: UInt = 0
+    @Option(
+        name: .long,
+        help: "Worker nodes to create: a number, or count=<n>,cpus=<n>,memory=<size> (repeat for groups of differently sized workers)")
+    var workers: [String] = []
 
-    /// Task count is `4 + workers` as an `Int`, so keep `workers` far enough below `Int.max` to avoid overflow.
+    /// Task count is `4 + total workers` as an `Int`, so keep the total far enough below `Int.max` to avoid overflow.
     static let maxWorkers: UInt = 1024
 
     public func validate() throws {
-        guard workers <= Self.maxWorkers else {
-            throw ValidationError("--workers must be at most \(Self.maxWorkers)")
+        let groups = try WorkerGroup.parse(workers)
+        guard WorkerGroup.totalCount(of: groups) <= Self.maxWorkers else {
+            throw ValidationError("--workers must total at most \(Self.maxWorkers) worker nodes")
         }
     }
 
@@ -84,6 +87,12 @@ public struct K8sCreate: AsyncParsableCommand {
         // Fail before provisioning the node VM.
         _ = try K8sHelper.kubernetesVersion(nodeImage: nodeImage)
 
+        let workerGroups = try WorkerGroup.parse(workers)
+        let workerCount = Int(WorkerGroup.totalCount(of: workerGroups))
+        let resources = K8sHelper.clusterResources(
+            controlPlane: NodeResources(cpus: resourceFlags.cpus, memory: resourceFlags.memory),
+            groups: workerGroups)
+
         let isTTY = isatty(FileHandle.standardError.fileDescriptor) == 1
         // TotalTasks include:
         // start, kubeadm init, one per worker, wait, write kubeconfig.
@@ -92,7 +101,7 @@ public struct K8sCreate: AsyncParsableCommand {
             showTasks: true,
             showItems: true,
             ignoreSmallSize: true,
-            totalTasks: 4 + Int(workers),
+            totalTasks: 4 + workerCount,
             clearOnFinish: isTTY,
             outputMode: isTTY ? .ansi : .plain
         )
@@ -106,10 +115,10 @@ public struct K8sCreate: AsyncParsableCommand {
 
         let provisioner = try LinuxNodeProvisioner(
             clusterName: name,
-            roles: workers == 0 ? [StandardRoles.controlPlane, StandardRoles.worker] : [StandardRoles.controlPlane],
+            roles: workerCount == 0 ? [StandardRoles.controlPlane, StandardRoles.worker] : [StandardRoles.controlPlane],
             nodeImage: nodeImage,
-            cpus: resourceFlags.cpus,
-            memory: resourceFlags.memory,
+            cpus: resources.controlPlane.cpus,
+            memory: resources.controlPlane.memory,
             registryScheme: registryFlags.scheme,
             maxConcurrentDownloads: imageFetchFlags.maxConcurrentDownloads,
             remove: remove,
@@ -134,31 +143,36 @@ public struct K8sCreate: AsyncParsableCommand {
                 cniManifestPath: cni,
                 client: client, log: log)
 
-            if workers > 0 {
+            if workerCount > 0 {
                 let (token, caCertHash) = try await K8sHelper.createJoinToken(nodeID: name, client: client)
                 let controlPlaneEndpoint = "\(vmIP):\(K8sHelper.clusterContainerPort)"
-                for i in 1...workers {
-                    let workerName = "\(name)-worker-\(i)"
-                    progress.set(description: "Joining worker \(workerName)")
-                    let workerProvisioner = try LinuxNodeProvisioner(
-                        clusterName: name,
-                        roles: [StandardRoles.worker],
-                        nodeImage: nodeImage,
-                        cpus: resourceFlags.cpus,
-                        memory: resourceFlags.memory,
-                        registryScheme: registryFlags.scheme,
-                        maxConcurrentDownloads: imageFetchFlags.maxConcurrentDownloads,
-                        remove: remove
-                    )
-                    workerNames.append(workerName)
-                    try await workerProvisioner.provision(name: workerName, log: log)
-                    try await workerProvisioner.join(
-                        name: workerName, controlPlaneEndpoint: controlPlaneEndpoint,
-                        token: token, caCertHash: caCertHash, log: log)
-                    if skipCNI {
-                        try await workerProvisioner.waitForRegistered(name: workerName, log: log)
-                    } else {
-                        try await workerProvisioner.waitForReady(name: workerName, log: log)
+                // Workers are numbered across groups so every node keeps the `<name>-worker-<n>` form.
+                var index = 0
+                for (group, nodeResources) in zip(workerGroups, resources.workers) {
+                    for _ in 0..<group.count {
+                        index += 1
+                        let workerName = "\(name)-worker-\(index)"
+                        progress.set(description: "Joining worker \(workerName)")
+                        let workerProvisioner = try LinuxNodeProvisioner(
+                            clusterName: name,
+                            roles: [StandardRoles.worker],
+                            nodeImage: nodeImage,
+                            cpus: nodeResources.cpus,
+                            memory: nodeResources.memory,
+                            registryScheme: registryFlags.scheme,
+                            maxConcurrentDownloads: imageFetchFlags.maxConcurrentDownloads,
+                            remove: remove
+                        )
+                        workerNames.append(workerName)
+                        try await workerProvisioner.provision(name: workerName, log: log)
+                        try await workerProvisioner.join(
+                            name: workerName, controlPlaneEndpoint: controlPlaneEndpoint,
+                            token: token, caCertHash: caCertHash, log: log)
+                        if skipCNI {
+                            try await workerProvisioner.waitForRegistered(name: workerName, log: log)
+                        } else {
+                            try await workerProvisioner.waitForReady(name: workerName, log: log)
+                        }
                     }
                 }
             }
